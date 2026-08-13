@@ -1,0 +1,5 @@
+# bundle.zip is a binary build artifact - never touch its bytes
+*.zip binary
+# fonts and gcode must keep their exact bytes too
+*.svg -text
+*.gcode -text
