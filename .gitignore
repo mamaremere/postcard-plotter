@@ -1,0 +1,13 @@
+# generated plot output
+out/
+*.gcode
+*.preview.svg
+
+# python
+__pycache__/
+*.pyc
+
+# local
+shots/
+.DS_Store
+Thumbs.db

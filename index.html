@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Postcard Plotter — handwriting G-code</title>
+<meta name="description" content="Turn text into single-stroke handwriting G-code for a pen plotter.">
+<meta name="theme-color" content="#8a6a4a">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%E2%9C%92%EF%B8%8F</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="boot">
+  <div class="boot-card">
+    <div class="boot-pen">✒️</div>
+    <h1>Postcard Plotter</h1>
+    <p id="boot-msg">Starting…</p>
+    <div class="bar"><div id="boot-bar"></div></div>
+    <p class="boot-note">First visit downloads a ~11&nbsp;MB Python runtime.
+       After that it starts instantly and works offline.</p>
+  </div>
+</div>
+
+<header>
+  <h1>✒️ Postcard Plotter</h1>
+  <p>Type a message, choose a handwriting font, download G-code for Candle.</p>
+</header>
+
+<main>
+  <!-- ───────────────────────────── controls ───────────────────────────── -->
+  <section id="controls">
+
+    <fieldset>
+      <legend>Message</legend>
+      <textarea id="text" rows="9" spellcheck="true"></textarea>
+      <p class="hint">One paragraph per line — don't press Enter at the end of
+        each line, the layout wraps for you and packs tighter. A blank line
+        starts a new paragraph.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Handwriting</legend>
+      <label>Font
+        <select id="font"></select>
+      </label>
+      <p class="hint" id="font-note"></p>
+      <div class="row">
+        <label class="file-label">
+          <input type="file" id="font-file" accept=".svg">
+          <span>Upload a font…</span>
+        </label>
+        <button type="button" id="font-forget" class="ghost" hidden>Remove uploaded</button>
+      </div>
+      <p class="hint">Single-line SVG fonts only. Ordinary fonts (TTF/OTF) are
+        outline fonts and would plot as hollow double letters.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Size</legend>
+      <div class="modes">
+        <label class="radio"><input type="radio" name="mode" value="fit" checked>
+          <span><strong>Fit the writing area</strong><br>
+          <small>pick the biggest size that fits</small></span></label>
+        <label class="radio"><input type="radio" name="mode" value="fixed">
+          <span><strong>Fixed letter size</strong><br>
+          <small>you choose the height</small></span></label>
+      </div>
+
+      <div class="grid2">
+        <label>Writing area width
+          <span class="unit"><input type="number" id="box_w" step="1" min="5"><i>mm</i></span></label>
+        <label>Writing area height
+          <span class="unit"><input type="number" id="box_h" step="1" min="5"><i>mm</i></span></label>
+      </div>
+
+      <p class="readout" id="fit-readout"></p>
+
+      <div class="grid2">
+        <label data-when="fixed">Letter height
+          <span class="unit"><input type="number" id="height" step="0.5" min="0.5"><i>mm</i></span></label>
+        <label data-when="fixed">Wrap at
+          <span class="unit"><input type="number" id="max_width" step="1" min="5" placeholder="off"><i>mm</i></span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Layout</legend>
+      <div class="grid2">
+        <label>Align
+          <select id="align">
+            <option value="left">Left</option>
+            <option value="center">Centre</option>
+            <option value="right">Right</option>
+          </select></label>
+        <label>Vertical
+          <select id="valign">
+            <option value="top">Top</option>
+            <option value="middle">Middle</option>
+            <option value="bottom">Bottom</option>
+          </select></label>
+        <label>Line spacing
+          <input type="number" id="line_spacing" step="0.05" min="0.8"></label>
+        <label>Paragraph gap
+          <input type="number" id="paragraph_gap" step="0.1" min="0"></label>
+        <label>Letter spacing
+          <span class="unit"><input type="number" id="char_spacing" step="0.1"><i>mm</i></span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>The card</legend>
+      <div class="grid2">
+        <label>Card width
+          <span class="unit"><input type="number" id="card_w" step="1" min="20"><i>mm</i></span></label>
+        <label>Card height
+          <span class="unit"><input type="number" id="card_h" step="1" min="20"><i>mm</i></span></label>
+        <label>Writing area from left
+          <span class="unit"><input type="number" id="box_x" step="0.5" min="0"><i>mm</i></span></label>
+        <label>…from bottom
+          <span class="unit"><input type="number" id="box_y" step="0.5" min="0"><i>mm</i></span></label>
+      </div>
+      <label>Machine zero is at
+        <select id="zero_at">
+          <option value="box">the writing area's bottom-left corner</option>
+          <option value="card">the card's bottom-left corner</option>
+        </select></label>
+      <label class="check"><input type="checkbox" id="show_furniture" checked>
+        Show address side &amp; stamp box in the preview</label>
+    </fieldset>
+
+    <details>
+      <summary>Pen &amp; machine</summary>
+      <div class="grid2">
+        <label>Drawing speed
+          <span class="unit"><input type="number" id="draw_feed" step="100" min="100"><i>mm/min</i></span></label>
+        <label>Travel speed
+          <span class="unit"><input type="number" id="travel_feed" step="100" min="100"><i>mm/min</i></span></label>
+        <label>Pen-down delay
+          <span class="unit"><input type="number" id="pen_delay" step="0.05" min="0"><i>s</i></span></label>
+        <label>Pen power S
+          <input type="number" id="power" step="1" min="0" max="20000"></label>
+        <label>Pen down command
+          <input type="text" id="pen_down_cmd"></label>
+        <label>Pen up command
+          <input type="text" id="pen_up_cmd"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="go_home" checked>
+        Return to X0 Y0 when finished</label>
+      <label class="check"><input type="checkbox" id="smooth" checked>
+        Smooth the classic Hershey fonts (no effect on EMS fonts)</label>
+    </details>
+
+    <details>
+      <summary>Saved settings</summary>
+      <div class="row">
+        <input type="text" id="preset-name" placeholder="Name, e.g. Ministry postcard">
+        <button type="button" id="preset-save">Save</button>
+      </div>
+      <div class="row">
+        <select id="preset-list"><option value="">— saved settings —</option></select>
+        <button type="button" id="preset-load">Load</button>
+        <button type="button" id="preset-delete" class="ghost">Delete</button>
+      </div>
+      <button type="button" id="copy-link" class="ghost wide">Copy a link to these settings</button>
+      <p class="hint">Settings are stored in this browser only. The link carries
+        the settings, not your message text.</p>
+    </details>
+  </section>
+
+  <!-- ───────────────────────────── preview ───────────────────────────── -->
+  <section id="preview-pane">
+    <div class="preview-sticky">
+      <div id="preview-wrap">
+        <svg id="preview" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+
+      <div id="stats" class="stats"></div>
+      <div id="messages"></div>
+
+      <div class="actions">
+        <button type="button" id="dl-gcode" class="primary">Download .gcode</button>
+        <button type="button" id="dl-svg" class="ghost">Download preview .svg</button>
+      </div>
+
+      <p class="hint" id="zero-hint"></p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Runs entirely in your browser — your message is never uploaded anywhere.
+     Fonts: <a href="https://gitlab.com/inkscape/extensions" rel="noopener">EMS single-line</a>
+     (SIL OFL) and the Hershey set (Dr.&nbsp;A.&nbsp;V.&nbsp;Hershey, NBS).</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.28.0/full/pyodide.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
