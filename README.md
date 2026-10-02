@@ -1,7 +1,8 @@
 # Postcard Plotter — handwriting G-code in the browser
 
-Type a message, choose a single-stroke handwriting font, see it laid out on a
-real-size postcard, download `.gcode` for Candle.
+Type a message and the recipient's address, choose a single-stroke handwriting
+font, see both laid out on a real-size postcard, download one `.gcode` for
+Candle.
 
 It is a **static site**: the Python from [`../text2gcode`](../text2gcode) runs
 inside your browser through [Pyodide](https://pyodide.org). There is no server
@@ -43,6 +44,9 @@ command, publish directory `.`.
 | `index.html`, `app.js`, `style.css` | nothing — reload the page |
 | `webapi.py`, or anything in `../text2gcode` | `python build.py`, then commit `bundle.zip` |
 
+`.claude/launch.json` holds the same `http.server` command so the Claude
+desktop app's Browser pane can start the site with one click.
+
 `bundle.zip` is a build artifact (library + fonts + `webapi.py`) that is
 committed on purpose, because GitHub Pages cannot run `build.py` for you.
 `../text2gcode` remains the single source of truth; nothing is duplicated by
@@ -57,6 +61,15 @@ python tests/test_fidelity.py
 Asserts that `webapi.generate()` reproduces `../text2gcode/out/postcard_65x80.gcode`
 **exactly**. If a change to the layout, fitting, or smoothing code ever alters
 the output, this fails loudly instead of you discovering it on paper.
+
+```bash
+python tests/test_address.py
+```
+
+Checks the address block: a blank address leaves the G-code byte-identical,
+a typed one lands inside the address area after the message, lines are never
+re-wrapped, and fit mode reserves room for the configured number of lines.
+Needs only `lib/`, so it runs on a fresh clone.
 
 ## How the pieces fit
 
@@ -77,15 +90,31 @@ rulers and zero marker are drawn in JavaScript around the ink path.
 1. Type the message. **One paragraph per line** — don't press Enter at the end
    of each line; the layout wraps for you and packs tighter than hand-wrapping.
    A blank line starts a new paragraph.
-2. Pick a font. *EMS Allure* is the flowing formal cursive used for the
+2. Type the address, **one address line per row**, exactly as it should
+   appear on the card. Address lines are never re-wrapped. Leave it empty to
+   plot the message only (or leave the message empty to pre-address a batch).
+3. Pick a font. *EMS Allure* is the flowing formal cursive used for the
    ministry postcards.
-3. Choose **Fit the writing area** and set the area's width and height; the
+4. Choose **Fit the writing area** and set the area's width and height; the
    letter size is chosen for you (this disables the letter-height and wrap
    fields). Or choose **Fixed letter size** to drive it yourself, in which case
    the writing area becomes a guide that warns you when text overflows.
-4. Check the preview, then **Download .gcode**.
-5. In Candle: jog the pen to the corner marked `0,0` in the preview — by
+5. The address has the same two modes. **Fit the address area** picks the
+   largest size at which the longest line fits the width *and* at least
+   "Room for N lines" lines fit the height (default 6, a full UK address:
+   name, house and street, locality, post town, county, postcode). Reserving
+   the room means a 3-line address is not blown up to fill the box, so every
+   card in a batch gets the same address size.
+6. Check the preview, then **Download .gcode**. Message and address are in
+   the same file, message first.
+7. In Candle: jog the pen to the corner marked `0,0` in the preview — by
    default the bottom-left of the writing area — zero X and Y, and send.
+   The address coordinates are relative to that same zero.
+
+The card preview is a sketch, not a scan of your stock: the centre divider is
+where the message half ends, but the stamp box is a guess. The address area's
+position and size (under *The card* and *Address*) are the things to adjust
+to match your actual cards.
 
 Below about 3 mm capitals use a 0.2–0.3 mm gel pen or fineliner; a thicker
 ballpoint closes up the loops of cursive letters. Test on scrap paper cut to

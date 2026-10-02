@@ -24,8 +24,14 @@ const FIELDS = {
   align: 'str', valign: 'str', line_spacing: 'num', paragraph_gap: 'num',
   char_spacing: 'num', zero_at: 'str', draw_feed: 'num', travel_feed: 'num',
   power: 'num', pen_delay: 'num', pen_down_cmd: 'str', pen_up_cmd: 'str',
-  go_home: 'bool', smooth: 'bool'
+  go_home: 'bool', smooth: 'bool',
+  addr_w: 'num', addr_h: 'num', addr_x: 'num', addr_y: 'num',
+  addr_height: 'num', addr_lines: 'num', addr_valign: 'str'
 };
+
+/* the two free-text boxes: kept out of presets and share links */
+const TEXTS = ['text', 'address'];
+const MODES = ['mode', 'addr_mode'];
 
 let pyodide = null, webapi = null, DEFAULTS = {}, FONTS = [];
 let uploadedId = null, pending = null, lastPreview = null;
@@ -105,9 +111,9 @@ function initForm() {
     el.addEventListener(el.tagName === 'SELECT' || el.type === 'checkbox'
       ? 'change' : 'input', update);
   }
-  $('text').addEventListener('input', update);
+  for (const id of TEXTS) $(id).addEventListener('input', update);
   $('show_furniture').addEventListener('change', update);
-  for (const r of document.querySelectorAll('input[name=mode]')) {
+  for (const r of document.querySelectorAll('input[name=mode], input[name=addr_mode]')) {
     r.addEventListener('change', update);
   }
 
@@ -132,11 +138,14 @@ function applyParams(p) {
     if (kind === 'bool') el.checked = !!p[id];
     else el.value = p[id];
   }
-  if (p.mode) {
-    const r = document.querySelector(`input[name=mode][value="${p.mode}"]`);
+  for (const name of MODES) {
+    if (!p[name]) continue;
+    const r = document.querySelector(`input[name=${name}][value="${p[name]}"]`);
     if (r) r.checked = true;
   }
-  if (typeof p.text === 'string') $('text').value = p.text;
+  for (const id of TEXTS) {
+    if (typeof p[id] === 'string') $(id).value = p[id];
+  }
 }
 
 function getParams() {
@@ -150,15 +159,20 @@ function getParams() {
     const v = parseFloat(el.value);
     p[id] = Number.isFinite(v) ? v : DEFAULTS[id];
   }
-  p.mode = document.querySelector('input[name=mode]:checked').value;
-  p.text = $('text').value;
+  for (const name of MODES) {
+    p[name] = document.querySelector(`input[name=${name}]:checked`).value;
+  }
+  for (const id of TEXTS) p[id] = $(id).value;
   return p;
 }
 
-function syncModeUI(mode) {
-  const fit = mode === 'fit';
+function syncModeUI(p) {
+  const fit = p.mode === 'fit';
   $('height').disabled = fit;
   $('max_width').disabled = fit;
+  const afit = p.addr_mode === 'fit';
+  $('addr_lines').disabled = !afit;
+  $('addr_height').disabled = afit;
   const note = FONTS.find(f => f.id === $('font').value);
   $('font-note').textContent = note && note.note ? note.note : '';
 }
@@ -173,7 +187,7 @@ function update() {
 function run() {
   if (!webapi) return;
   const p = getParams();
-  syncModeUI(p.mode);
+  syncModeUI(p);
 
   let res;
   try {
@@ -184,41 +198,45 @@ function run() {
     return;
   }
 
-  if (res.empty) {
+  if (res.empty || !res.ok) {
     lastPreview = null;
-    drawCard(p, '');
+    drawCard(p, '', '');
     $('stats').innerHTML = '';
     $('fit-readout').textContent = '';
-    showMessages([{ kind: 'msg', text: 'Type a message to see it on the card.' }]);
-    $('dl-gcode').disabled = true;
-    return;
-  }
-  if (!res.ok) {
-    lastPreview = null;
-    drawCard(p, '');
-    $('stats').innerHTML = '';
-    $('fit-readout').textContent = '';
-    showMessages([{ kind: 'error', text: res.error }]);
+    $('addr-readout').textContent = '';
+    showMessages([res.empty
+      ? { kind: 'msg', text: 'Type a message or an address to see it on the card.' }
+      : { kind: 'error', text: res.error }]);
     $('dl-gcode').disabled = true;
     return;
   }
 
   lastPreview = { params: p, res };
   $('dl-gcode').disabled = false;
-  drawCard(p, res.ink_path_d);
+  const msg = res.message, addr = res.address;
+  drawCard(p, msg ? msg.ink_path_d : '', addr ? addr.ink_path_d : '');
 
-  const i = res.info;
-  $('fit-readout').textContent = p.mode === 'fit'
-    ? `Auto size: ${i.cap_height} mm capitals, ${i.lines} lines`
+  $('fit-readout').textContent = msg && p.mode === 'fit'
+    ? `Auto size: ${msg.info.cap_height} mm capitals, ${msg.info.lines} lines`
     : '';
-  $('stats').innerHTML = [
-    `<b>${i.width}</b> × <b>${i.height}</b> mm`,
-    `<b>${i.cap_height}</b> mm capitals`,
-    `<b>${i.lines}</b> lines`,
-    `<b>${i.strokes}</b> pen strokes`,
-    `<b>${(i.ink_mm / 1000).toFixed(1)}</b> m of ink`,
-    `about <b>${i.minutes}</b> min`
-  ].map(s => `<span>${s}</span>`).join('');
+  $('addr-readout').textContent = addr && p.addr_mode === 'fit'
+    ? `Auto size: ${addr.info.cap_height} mm capitals, ${addr.info.lines} lines`
+    : '';
+
+  const i = res.info, pills = [];
+  if (msg) {
+    pills.push(`message <b>${msg.info.width}</b> × <b>${msg.info.height}</b> mm`,
+               `<b>${msg.info.cap_height}</b> mm capitals`,
+               `<b>${msg.info.lines}</b> lines`);
+  }
+  if (addr) {
+    pills.push(`address <b>${addr.info.cap_height}</b> mm capitals`,
+               `<b>${addr.info.lines}</b> address lines`);
+  }
+  pills.push(`<b>${i.strokes}</b> pen strokes`,
+             `<b>${(i.ink_mm / 1000).toFixed(1)}</b> m of ink`,
+             `about <b>${i.minutes}</b> min`);
+  $('stats').innerHTML = pills.map(s => `<span>${s}</span>`).join('');
 
   showMessages(res.warnings.map(w => ({ kind: 'msg', text: w })));
 
@@ -238,26 +256,38 @@ const escapeHtml = s => s.replace(/[&<>"]/g, c =>
 
 /* ───────────────────────── card illustration ──────────────────────── */
 
-function drawCard(p, inkPathD) {
+function drawCard(p, inkPathD, addrPathD) {
   const cw = p.card_w, ch = p.card_h, pad = 7;
   const bx = p.box_x, bw = p.box_w, bh = p.box_h;
   const byTop = ch - p.box_y - bh;                    // box top edge, SVG space
+  const ax = p.addr_x, aw = p.addr_w, ah = p.addr_h;
+  const ayTop = ch - p.addr_y - ah;
   const zx = p.zero_at === 'box' ? bx : 0;
   const zy = p.zero_at === 'box' ? ch - p.box_y : ch;
 
   let furniture = '';
   if ($('show_furniture').checked) {
-    const lines = [];
-    for (let k = 0; k < 4; k++) {
-      const y = ch * 0.52 + k * (ch * 0.11);
-      lines.push(`<line x1="${cw * 0.56}" y1="${y}" x2="${cw - 8}" y2="${y}"/>`);
-    }
+    // The divider is real; the stamp box is a guess at where a stamp goes.
     furniture = `
       <g class="furniture">
         <line x1="${cw / 2}" y1="8" x2="${cw / 2}" y2="${ch - 8}"/>
         <rect x="${cw - 26}" y="7" width="19" height="23" rx="1.5"/>
-        ${lines.join('')}
       </g>`;
+  }
+
+  // While no address is typed, rule the address area with as many faint
+  // lines as the fit reserves room for, so you can see what "room for
+  // 6 lines" means on the card. The ink replaces them once you type.
+  let guides = '';
+  if (!addrPathD) {
+    const n = Math.max(1, Math.round(p.addr_lines || 1));
+    const pitch = ah / n;
+    const rows = [];
+    for (let k = 1; k <= n; k++) {
+      const y = ayTop + k * pitch - pitch * 0.25;     // roughly a baseline
+      rows.push(`<line x1="${ax}" y1="${y}" x2="${ax + aw}" y2="${y}"/>`);
+    }
+    guides = `<g class="guides">${rows.join('')}</g>`;
   }
 
   const ticks = [];
@@ -272,6 +302,8 @@ function drawCard(p, inkPathD) {
       .furniture { stroke: #c9bda9; stroke-width: .3; fill: none; opacity: .8; }
       .box   { fill: none; stroke: var(--accent); stroke-width: .35;
                stroke-dasharray: 2 1.6; opacity: .75; }
+      .box.addr { opacity: .45; }
+      .guides { stroke: #c9bda9; stroke-width: .3; opacity: .8; }
       .ink   { fill: none; stroke: #1c1c1c; stroke-width: .32;
                stroke-linecap: round; stroke-linejoin: round; }
       .ticks { stroke: #b9ad99; stroke-width: .25; }
@@ -282,7 +314,10 @@ function drawCard(p, inkPathD) {
     ${furniture}
     <g class="ticks">${ticks.join('')}</g>
     <rect class="box" x="${bx}" y="${byTop}" width="${bw}" height="${bh}"/>
+    <rect class="box addr" x="${ax}" y="${ayTop}" width="${aw}" height="${ah}"/>
+    ${guides}
     <path class="ink" d="${inkPathD}"/>
+    <path class="ink" d="${addrPathD}"/>
     <g class="zero">
       <line x1="${zx - 3}" y1="${zy}" x2="${zx + 3}" y2="${zy}"/>
       <line x1="${zx}" y1="${zy - 3}" x2="${zx}" y2="${zy + 3}"/>
@@ -404,7 +439,7 @@ function savePreset() {
   if (!name) { toast('Give the settings a name first'); return; }
   const all = readPresets();
   const p = getParams();
-  delete p.text;
+  for (const id of TEXTS) delete p[id];     // settings only, never the words
   all[name] = p;
   localStorage.setItem(PRESET_KEY, JSON.stringify(all));
   $('preset-name').value = '';
@@ -434,7 +469,7 @@ function deletePreset() {
 
 function copyLink() {
   const p = getParams();
-  delete p.text;                       // the message stays private
+  for (const id of TEXTS) delete p[id];     // the message and address stay private
   const url = location.origin + location.pathname +
     '#p=' + encodeURIComponent(JSON.stringify(p));
   navigator.clipboard.writeText(url)

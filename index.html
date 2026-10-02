@@ -24,7 +24,7 @@
 
 <header>
   <h1>✒️ Postcard Plotter</h1>
-  <p>Type a message, choose a handwriting font, download G-code for Candle.</p>
+  <p>Type a message and the address, choose a handwriting font, download G-code for Candle.</p>
 </header>
 
 <main>
@@ -37,6 +37,46 @@
       <p class="hint">One paragraph per line — don't press Enter at the end of
         each line, the layout wraps for you and packs tighter. A blank line
         starts a new paragraph.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Address</legend>
+      <textarea id="address" rows="6" spellcheck="false"
+        placeholder="Mr &amp; Mrs J Smith&#10;14 Church Lane&#10;St Albans&#10;Hertfordshire&#10;AL3 4QP"></textarea>
+      <p class="hint">One address line per row, exactly as it should appear —
+        address lines are never re-wrapped. Leave it empty to plot the
+        message only.</p>
+
+      <div class="modes">
+        <label class="radio"><input type="radio" name="addr_mode" value="fit" checked>
+          <span><strong>Fit the address area</strong><br>
+          <small>sized so a full UK address fits</small></span></label>
+        <label class="radio"><input type="radio" name="addr_mode" value="fixed">
+          <span><strong>Fixed letter size</strong><br>
+          <small>you choose the height</small></span></label>
+      </div>
+
+      <div class="grid2">
+        <label>Address area width
+          <span class="unit"><input type="number" id="addr_w" step="1" min="5"><i>mm</i></span></label>
+        <label>Address area height
+          <span class="unit"><input type="number" id="addr_h" step="1" min="5"><i>mm</i></span></label>
+        <label data-when="addr-fit">Room for at least
+          <span class="unit"><input type="number" id="addr_lines" step="1" min="1" max="12"><i>lines</i></span></label>
+        <label data-when="addr-fixed">Letter height
+          <span class="unit"><input type="number" id="addr_height" step="0.5" min="0.5"><i>mm</i></span></label>
+        <label>Vertical
+          <select id="addr_valign">
+            <option value="top">Top</option>
+            <option value="middle">Middle</option>
+            <option value="bottom">Bottom</option>
+          </select></label>
+      </div>
+      <p class="readout" id="addr-readout"></p>
+      <p class="hint">A UK address usually runs to 5 or 6 lines (name, house
+        and street, locality, post town, county, postcode). Reserving room for
+        that many keeps every card's address the same size, whether a
+        particular one has 3 lines or 6.</p>
     </fieldset>
 
     <fieldset>
@@ -119,6 +159,10 @@
           <span class="unit"><input type="number" id="box_x" step="0.5" min="0"><i>mm</i></span></label>
         <label>…from bottom
           <span class="unit"><input type="number" id="box_y" step="0.5" min="0"><i>mm</i></span></label>
+        <label>Address area from left
+          <span class="unit"><input type="number" id="addr_x" step="0.5" min="0"><i>mm</i></span></label>
+        <label>…from bottom
+          <span class="unit"><input type="number" id="addr_y" step="0.5" min="0"><i>mm</i></span></label>
       </div>
       <label>Machine zero is at
         <select id="zero_at">
@@ -126,7 +170,7 @@
           <option value="card">the card's bottom-left corner</option>
         </select></label>
       <label class="check"><input type="checkbox" id="show_furniture" checked>
-        Show address side &amp; stamp box in the preview</label>
+        Show the centre divider &amp; stamp box in the preview</label>
     </fieldset>
 
     <details>
@@ -164,7 +208,7 @@
       </div>
       <button type="button" id="copy-link" class="ghost wide">Copy a link to these settings</button>
       <p class="hint">Settings are stored in this browser only. The link carries
-        the settings, not your message text.</p>
+        the settings, not your message or the address.</p>
     </details>
   </section>
 

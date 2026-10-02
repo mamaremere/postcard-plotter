@@ -108,6 +108,7 @@ input[type=text], input[type=number], select, textarea {
   padding: .45rem .55rem;
 }
 textarea { resize: vertical; line-height: 1.55; font-size: .88rem; }
+#address { white-space: pre; overflow-x: auto; }   /* one address line per row */
 input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent;
 }
